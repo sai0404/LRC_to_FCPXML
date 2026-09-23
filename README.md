@@ -5,7 +5,7 @@ Make your Lyrical video songs from given lrc ( lyrics with time-synced) singing 
 I'm presently made only for final cut pro where you can download your time-synced generator(normal one) by giving input as video's .lrc or .srt version.
 
 
-**Try it here :** https://sai0404.github.io/LRC_to_FCPXML/
+**Try it here :** https://sai0404.github.io/SyncVerse/
 
 
 
