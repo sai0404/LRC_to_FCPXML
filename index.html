@@ -975,40 +975,105 @@ function getFPSFrac(){
 }
 function getVPos(){if(fcpOpts.pos==='top')return'0 300';if(fcpOpts.pos==='bottom')return'0 -300';return'0 0'}
 function generateFCPXML(lines){
+  // ─────────────────────────────────────────────────────────────
+  // LINE HIGHLIGHT FCPXML
+  // Shows a rolling window of 7 lines (3 above + active + 3 below)
+  // For each active line we generate ONE title clip that contains
+  // ALL 7 visible lines as styled text spans:
+  //   • Active line  → BOLD, bright white, larger font, glow shadow
+  //   • ±1 lines     → Regular, medium dim
+  //   • ±2 lines     → Regular, more dim
+  //   • ±3 lines     → Regular, very dim
+  // As timestamps progress → next clip → next line becomes bold.
+  // Result: smooth karaoke scroll feel in FCP with zero animation needed.
+  // ─────────────────────────────────────────────────────────────
+  if(!lines.length) return '';
   const {w,h}=getResolution(),{fd,name}=getFPSFrac();
   const totalFrac=toFCP(lines[lines.length-1].ts+lines[lines.length-1].dur);
-  const colorRGBA=hexToRGBA(fcpOpts.color||'#ffffff');
-  const shadowAttr=fcpOpts.shadow?`shadowColor="0 0 0 0.8" shadowOffset="5 315" shadowBlurRadius="10"`:'';
+  const font=fcpOpts.font;
+  const activeSize=fcpOpts.fontSize;          // active line font size
+  const shadowAttr=fcpOpts.shadow
+    ?`shadowColor="0 0 0 0.9" shadowOffset="4 315" shadowBlurRadius="12"` :'';
+  const alignVal=fcpOpts.align==='left'?0:fcpOpts.align==='right'?2:1;
   const vPos=getVPos();
-  let fx='',clips='';
-  lines.forEach((line,i)=>{
-    const rid=`r${i+3}`,offset=toFCPoff(line.ts),dur=toFCPoff(line.dur);
-    const safe=t=>t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    const safeA=safe(line.displayText);
-    const safeC=line.displayText.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    const tsid=`ts${i+1}`;
+  const activeRGBA=hexToRGBA(fcpOpts.color||'#ffffff');
+
+  // Dim levels for surrounding lines
+  // diff=distance from active (1=adjacent, 2=two away, 3=three away)
+  const dimLevel={
+    1:'0.65 0.65 0.70 1',   // ±1 — clearly readable, slightly dim
+    2:'0.40 0.40 0.45 1',   // ±2 — noticeable but secondary
+    3:'0.22 0.22 0.26 1',   // ±3 — barely visible, like ghost text
+  };
+  const sizeScale={1:0.88, 2:0.80, 3:0.74}; // font size scale per distance
+
+  const safeA=t=>(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const safeC=t=>(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  let fx='', clips='';
+  let ridC=3, tsC=1;
+
+  lines.forEach((activeLine, activeIdx)=>{
+    const offset=toFCPoff(activeLine.ts);
+    const dur=toFCPoff(activeLine.dur);
+    const rid=`r${ridC++}`;
+    const clipLabel=safeA(activeLine.displayText.slice(0,28));
+
+    // Window: show lines from (activeIdx-3) to (activeIdx+3)
+    const windowStart=Math.max(0, activeIdx-3);
+    const windowEnd=Math.min(lines.length-1, activeIdx+3);
+
+    let textBlock='<text>';
+    let tsDefs='';
+
+    for(let li=windowStart; li<=windowEnd; li++){
+      const diff=Math.abs(li-activeIdx); // 0=active, 1=adjacent, 2,3=far
+      const isActive=(diff===0);
+      const spanId=`ts${tsC++}`;
+
+      const color   = isActive ? activeRGBA : (dimLevel[diff]||dimLevel[3]);
+      const bold    = isActive ? 'Bold' : 'Regular';
+      const fSize   = isActive ? activeSize : Math.round(activeSize*(sizeScale[diff]||0.74));
+      const shadow  = isActive ? shadowAttr : '';
+      const lineText= safeC(lines[li].displayText);
+
+      // Newline between lines — &#10; is FCP's line break inside <text>
+      const sep = li < windowEnd ? '&#10;' : '';
+      textBlock+=`<text-style ref="${spanId}">${lineText}${sep}</text-style>`;
+      tsDefs+=`
+                                <text-style-def id="${spanId}">
+                                    <text-style font="${font}" fontSize="${fSize}" fontFace="${bold}"
+                                        fontColor="${color}" ${shadow} alignment="${fcpOpts.align}"/>
+                                </text-style-def>`;
+    }
+    textBlock+='</text>';
+
     fx+=`\n        <effect id="${rid}" name="Basic Title" uid=".../Titles.localized/Bumper:Opener.localized/Basic Title.localized/Basic Title.moti"/>`;
     clips+=`
-                            <title name="${safeA}" lane="1" offset="${offset}" duration="${dur}" start="0s" ref="${rid}">
+                            <!-- Active line ${activeIdx+1}/${lines.length}: ${clipLabel} -->
+                            <title name="${clipLabel} [${activeIdx+1}]" lane="1" offset="${offset}" duration="${dur}" start="0s" ref="${rid}">
                                 <param name="Position" key="9999/10003/13069/13070/1/100/101" value="${vPos}"/>
-                                <param name="Alignment" key="9999/10003/13069/13070/2/354/999" value="${fcpOpts.align==='left'?0:fcpOpts.align==='right'?2:1}"/>
-                                <text><text-style ref="${tsid}">${safeC}</text-style></text>
-                                <text-style-def id="${tsid}">
-                                    <text-style font="${fcpOpts.font}" fontSize="${fcpOpts.fontSize}" fontFace="Bold"
-                                        fontColor="${colorRGBA}" ${shadowAttr} alignment="${fcpOpts.align}"/>
-                                </text-style-def>
+                                <param name="Alignment" key="9999/10003/13069/13070/2/354/999" value="${alignVal}"/>
+                                ${textBlock}${tsDefs}
                             </title>`;
   });
+
   return`<?xml version="1.0" encoding="UTF-8"?>
 <fcpxml version="1.11">
     <resources>
         <format id="r1" name="${name}" frameDuration="${fd}" width="${w}" height="${h}" colorSpace="1-1-1 (Rec. 709)"/>${fx}
     </resources>
     <library location="file:///Users/Shared/FCP_Lyrics.fcpbundle">
-        <event name="Lyrics Timeline">
-            <project name="Lyrical Song Video">
+        <event name="Lyrics Timeline — Line Highlight">
+            <project name="Lyrical Song Video (7-Line Window)">
                 <sequence format="r1" duration="${totalFrac}" tcStart="0s" tcFormat="NDF" audioLayout="stereo" audioRate="48k">
                     <spine>
+                        <!-- Rolling 7-line window. Each clip = one active line.
+                             Active line: BOLD WHITE large.
+                             ±1: dim 65%, 88% size.
+                             ±2: dim 40%, 80% size.
+                             ±3: dim 22%, 74% size.
+                             Edit font/size/color in FCP Inspector then Regenerate. -->
                         <gap name="Background" offset="0s" duration="${totalFrac}" start="0s">${clips}
                         </gap>
                     </spine>
