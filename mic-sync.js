@@ -251,7 +251,7 @@
         <div class="mic-setting">
           <label>Offset (ms)</label>
           <input type="number" class="mic-select" id="mic-offset-inp"
-            value="0" step="50" style="width:70px" title="Add ms to all timestamps"/>
+            value="-1500" step="50" style="width:70px" title="Add ms to all timestamps. -1500ms = real-time WhisperX sync"/>
         </div>
       </div>
 
