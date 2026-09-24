@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>LRC / SRT → Final Cut Pro · Lyrics Sync</title>
+<title>SyncVerse — LRC / SRT → Final Cut Pro</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+Devanagari:wght@400;500&family=Noto+Sans+Telugu:wght@400;500&family=Noto+Sans+Malayalam:wght@400;500&display=swap');
 
@@ -350,8 +350,8 @@ header h1 em{font-style:normal;color:var(--text3);font-weight:400}
 
 <header>
   <div class="logo">🎬</div>
-  <h1>LyricSync <em>→ FCP</em></h1>
-  <div class="hbadge">LRC · SRT → FCPXML</div>
+  <h1>SyncVerse <em>→ FCP</em></h1>
+  <div class="hbadge">SyncVerse · LRC · SRT → FCPXML</div>
   <div class="header-right">
     <span class="fmt-pill" id="fmt-pill">LRC</span>
   </div>
@@ -495,8 +495,12 @@ SRT block:       1&#10;00:00:05,000 --> 00:00:08,000&#10;Hello world
             </div>
           </div>
           <div class="setting-group">
-            <span class="setting-label">Color</span>
-            <input type="color" id="opt-color" value="#ffffff" style="width:28px;height:24px;border:1px solid var(--border);border-radius:4px;background:var(--bg3);cursor:pointer;padding:1px"/>
+            <span class="setting-label">Text color</span>
+            <input type="color" id="opt-color" value="#ffffff" title="Base text colour (all lines)" style="width:28px;height:24px;border:1px solid var(--border);border-radius:4px;background:var(--bg3);cursor:pointer;padding:1px"/>
+          </div>
+          <div class="setting-group">
+            <span class="setting-label">Active line</span>
+            <input type="color" id="opt-active-color" value="#e8a820" title="Colour of the currently active line in Full Lyrics FCPXML" style="width:28px;height:24px;border:1px solid var(--border);border-radius:4px;background:var(--bg3);cursor:pointer;padding:1px"/>
           </div>
           <div class="setting-group">
             <span class="setting-label">Shadow</span>
@@ -508,14 +512,14 @@ SRT block:       1&#10;00:00:05,000 --> 00:00:08,000&#10;Hello world
           <div class="setting-group">
             <span class="setting-label">Timestamp source</span>
             <div class="setting-toggle">
-              <button class="stog-btn on" data-val="0"    data-grp="src" onclick="setToggle(this);setOffsetPreset(0)"    title="WhisperX — already exact, no shift needed">WhisperX</button>
+              <button class="stog-btn on" data-val="-1500" data-grp="src" onclick="setToggle(this);setOffsetPreset(-1500)" title="WhisperX real-time sync — -1500ms keeps word highlight in sync with audio">WhisperX</button>
               <button class="stog-btn"    data-val="-1500" data-grp="src" onclick="setToggle(this);setOffsetPreset(-1500)" title="Web Speech API — compensates ~1.5s buffer delay">WebSpeech</button>
               <button class="stog-btn"    data-val="-800"  data-grp="src" onclick="setToggle(this);setOffsetPreset(-800)"  title="Deepgram / AssemblyAI — ~800ms latency">Deepgram</button>
             </div>
           </div>
           <div class="setting-group">
             <span class="setting-label">Offset (ms)</span>
-            <input type="number" class="setting-select" id="opt-offset" value="0"
+            <input type="number" class="setting-select" id="opt-offset" value="-1500"
               step="50" style="width:68px" title="Fine-tune: positive = shift later, negative = shift earlier"/>
           </div>
           <div class="setting-group">
@@ -545,7 +549,8 @@ SRT block:       1&#10;00:00:05,000 --> 00:00:08,000&#10;Hello world
       <h2>③ Output</h2>
       <div class="panel-right">
         <div class="output-tabs" style="border:none;background:transparent">
-          <button class="otab active" onclick="switchTab('fcpxml',this)" title="One title clip per line">Line FCPXML</button>
+          <button class="otab active" onclick="switchTab('fcpxml',this)" title="7-line rolling window — current line bold white, others dim">Line FCPXML</button>
+          <button class="otab" onclick="switchTab('full_fcpxml',this)" title="ALL lyrics visible, only active line changes colour — place title anywhere in FCP">Full Lyrics FCPXML</button>
           <button class="otab" onclick="switchTab('word_fcpxml',this)" title="Full line visible, active word glows — needs word timestamps">Karaoke FCPXML</button>
           <button class="otab" onclick="switchTab('tele_fcpxml',this)" title="All lines on screen, current line bold — like @moonlighteasylyrics style">Teleprompter FCPXML</button>
           <button class="otab" onclick="switchTab('srt',this)">SRT</button>
@@ -684,7 +689,7 @@ SRT block:       1&#10;00:00:05,000 --> 00:00:08,000&#10;Hello world
 // STATE
 // ──────────────────────────────────────────
 let parsedLines=[], totalDuration=0, currentTab='fcpxml';
-let outputs={fcpxml:'',word_fcpxml:'',tele_fcpxml:'',csv:'',srt:''}, detectedFormat='';
+let outputs={fcpxml:'',full_fcpxml:'',word_fcpxml:'',tele_fcpxml:'',csv:'',srt:''}, detectedFormat='';
 let playState='stopped', playPos=0, playSpeed=1, rafId=null, lastRAF=null;
 let playerOpen=false, lastPlayerIdx=-1, currentPlayerMode='standard';
 
@@ -695,7 +700,7 @@ let currentPlayingIdx=-1;
 // For scroll list: track last highlighted index to avoid full DOM sweep
 let plsLastIdx=-1;
 
-const fcpOpts={res:'1920x1080',fps:'25',fontSize:72,font:'Helvetica Neue',align:'center',pos:'center',color:'#ffffff',shadow:true,offsetMs:0,countdown:1};
+const fcpOpts={res:'1920x1080',fps:'25',fontSize:72,font:'Helvetica Neue',align:'center',pos:'center',color:'#ffffff',shadow:true,offsetMs:-1500,countdown:1,activeColor:'#e8a820',baseColor:'#ffffff'};
 
 // ──────────────────────────────────────────
 // FCP TOGGLES
@@ -719,9 +724,11 @@ function readOpts(){
   fcpOpts.fontSize=parseInt(document.getElementById('opt-fontsize').value);
   fcpOpts.font=document.getElementById('opt-font').value;
   fcpOpts.color=document.getElementById('opt-color').value;
+  fcpOpts.activeColor=document.getElementById('opt-active-color').value;
+  fcpOpts.baseColor=document.getElementById('opt-color').value;
   fcpOpts.offsetMs=parseInt(document.getElementById('opt-offset').value)||0;
 }
-function regenerate(){readOpts();outputs.fcpxml=generateFCPXML(parsedLines);outputs.word_fcpxml=generateWordFCPXML(parsedLines);outputs.tele_fcpxml=generateTeleFCPXML(parsedLines);renderOutput();showToast('FCPXML regenerated','success')}
+function regenerate(){readOpts();outputs.fcpxml=generateFCPXML(parsedLines);outputs.full_fcpxml=generateFullFCPXML(parsedLines);outputs.word_fcpxml=generateWordFCPXML(parsedLines);outputs.tele_fcpxml=generateTeleFCPXML(parsedLines);renderOutput();showToast('FCPXML regenerated','success')}
 
 // ──────────────────────────────────────────
 // PLAYER OPEN/CLOSE
@@ -1083,6 +1090,104 @@ function generateFCPXML(lines){
     </library>
 </fcpxml>`;
 }
+function generateFullFCPXML(lines){
+  // ─────────────────────────────────────────────────────────────
+  // FULL LYRICS FCPXML — SyncVerse
+  //
+  // ALL lyrics are shown as one text block at all times.
+  // For each LRC timestamp, ONE title clip is generated.
+  // That clip contains EVERY lyric line as styled text spans:
+  //   • Active line  → activeColor (gold/custom) — SAME size/weight as others
+  //   • All others   → baseColor (white/custom)
+  //
+  // NO bold, NO size change, NO dim — only colour changes.
+  // You place/position/resize the title block in FCP manually.
+  // Perfect for the "Blue - Yung Kai" / "Die with a Smile" style.
+  // ─────────────────────────────────────────────────────────────
+  if(!lines.length) return '';
+  const {w,h}=getResolution(),{fd,name}=getFPSFrac();
+  const totalFrac=toFCP(lines[lines.length-1].ts+lines[lines.length-1].dur);
+  const font=fcpOpts.font;
+  const fontSize=fcpOpts.fontSize;
+  const alignVal=fcpOpts.align==='left'?0:fcpOpts.align==='right'?2:1;
+  const vPos=getVPos();
+
+  // Active line colour = activeColor setting (default gold #e8a820)
+  // Base/rest colour  = baseColor (same as main text colour #ffffff)
+  const activeRGBA=hexToRGBA(fcpOpts.activeColor||'#e8a820');
+  const baseRGBA  =hexToRGBA(fcpOpts.baseColor ||'#ffffff');
+
+  const safeA=t=>(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const safeC=t=>(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  let fx='', clips='';
+  let ridC=3, tsC=1;
+
+  lines.forEach((activeLine, activeIdx)=>{
+    const offset=toFCPoff(activeLine.ts);
+    const dur   =toFCPoff(activeLine.dur);
+    const rid   =`r${ridC++}`;
+    const label =safeA(activeLine.displayText.slice(0,28));
+
+    // Build one <text> block with ALL lines
+    // Active line → activeColor span
+    // Every other line → baseColor span
+    // &#10; = line break in FCP text
+    let textBlock='<text>';
+    let tsDefs='';
+
+    lines.forEach((line, li)=>{
+      const spanId=`ts${tsC++}`;
+      const isActive=(li===activeIdx);
+      const color=isActive ? activeRGBA : baseRGBA;
+      const lineText=safeC(line.displayText);
+      const sep=li<lines.length-1?'&#10;':'';
+
+      textBlock+=`<text-style ref="${spanId}">${lineText}${sep}</text-style>`;
+      tsDefs+=`
+                                <text-style-def id="${spanId}">
+                                    <text-style font="${font}" fontSize="${fontSize}" fontFace="Regular"
+                                        fontColor="${color}" alignment="${fcpOpts.align}"/>
+                                </text-style-def>`;
+    });
+
+    textBlock+='</text>';
+
+    fx+=`\n        <effect id="${rid}" name="Basic Title" uid=".../Titles.localized/Bumper:Opener.localized/Basic Title.localized/Basic Title.moti"/>`;
+    clips+=`
+                            <!-- Line ${activeIdx+1}/${lines.length}: ${label} -->
+                            <title name="${label} [${activeIdx+1}]" lane="1" offset="${offset}" duration="${dur}" start="0s" ref="${rid}">
+                                <param name="Position" key="9999/10003/13069/13070/1/100/101" value="${vPos}"/>
+                                <param name="Alignment" key="9999/10003/13069/13070/2/354/999" value="${alignVal}"/>
+                                ${textBlock}${tsDefs}
+                            </title>`;
+  });
+
+  return`<?xml version="1.0" encoding="UTF-8"?>
+<fcpxml version="1.11">
+    <resources>
+        <format id="r1" name="${name}" frameDuration="${fd}" width="${w}" height="${h}" colorSpace="1-1-1 (Rec. 709)"/>${fx}
+    </resources>
+    <library location="file:///Users/Shared/FCP_Lyrics.fcpbundle">
+        <event name="SyncVerse — Full Lyrics">
+            <project name="Full Lyrics (Colour Highlight)">
+                <sequence format="r1" duration="${totalFrac}" tcStart="0s" tcFormat="NDF" audioLayout="stereo" audioRate="48k">
+                    <spine>
+                        <!-- All lyrics always visible.
+                             Active line colour = activeColor setting.
+                             All other lines    = baseColor setting.
+                             No bold, no size change — colour only.
+                             Position/size this title block manually in FCP. -->
+                        <gap name="Background" offset="0s" duration="${totalFrac}" start="0s">${clips}
+                        </gap>
+                    </spine>
+                </sequence>
+            </project>
+        </event>
+    </library>
+</fcpxml>`;
+}
+
 function generateCSV(lines){
   let o='Line,Text,Start,End,Duration_sec,Start_sec,End_sec\n';
   lines.forEach((l,i)=>{const s='"'+l.displayText.replace(/"/g,'""')+'"';o+=`${i+1},${s},${toDisp(l.ts)},${toDisp(l.ts+l.dur)},${l.dur.toFixed(3)},${l.ts.toFixed(3)},${(l.ts+l.dur).toFixed(3)}\n`});
@@ -1398,6 +1503,7 @@ function processInput(){
 
   readOpts();
   outputs.fcpxml=generateFCPXML(parsedLines);
+  outputs.full_fcpxml=generateFullFCPXML(parsedLines);
   outputs.word_fcpxml=generateWordFCPXML(parsedLines);
   outputs.tele_fcpxml=generateTeleFCPXML(parsedLines);
   outputs.csv=generateCSV(parsedLines);
@@ -1750,7 +1856,7 @@ function renderOutput(){
     }
     return;
   }
-  if(currentTab==='fcpxml'||currentTab==='word_fcpxml'||currentTab==='tele_fcpxml') box.innerHTML=synHL(content);
+  if(currentTab==='fcpxml'||currentTab==='full_fcpxml'||currentTab==='word_fcpxml'||currentTab==='tele_fcpxml') box.innerHTML=synHL(content);
   else box.textContent=content;
 }
 function synHL(xml){
@@ -1768,7 +1874,7 @@ function copyOutput(){
 function downloadOutput(){
   const c=outputs[currentTab];if(!c){showToast('Convert first','error');return;}
   const ext={fcpxml:'fcpxml',csv:'csv',srt:'srt'}[currentTab];
-  const label={fcpxml:'Final Cut Pro XML',word_fcpxml:'Karaoke FCP XML',tele_fcpxml:'Teleprompter FCP XML',csv:'CSV Spreadsheet',srt:'SRT Subtitle'}[currentTab];
+  const label={fcpxml:'Final Cut Pro XML',full_fcpxml:'Full Lyrics FCP XML',word_fcpxml:'Karaoke FCP XML',tele_fcpxml:'Teleprompter FCP XML',csv:'CSV Spreadsheet',srt:'SRT Subtitle'}[currentTab];
   // Show modal
   document.getElementById('dl-ext-badge').textContent='.'+ext;
   document.getElementById('dl-modal-sub').textContent=`Saving as ${label} (.${ext})`;
@@ -1782,8 +1888,8 @@ function closeDlModal(){
 }
 function confirmDownload(){
   const c=outputs[currentTab];if(!c)return;
-  const ext={fcpxml:'fcpxml',word_fcpxml:'fcpxml',tele_fcpxml:'fcpxml',csv:'csv',srt:'srt'}[currentTab];
-  const mime={fcpxml:'text/xml;charset=utf-8',word_fcpxml:'text/xml;charset=utf-8',tele_fcpxml:'text/xml;charset=utf-8',csv:'text/csv;charset=utf-8',srt:'text/plain;charset=utf-8'}[currentTab];
+  const ext={fcpxml:'fcpxml',full_fcpxml:'fcpxml',word_fcpxml:'fcpxml',tele_fcpxml:'fcpxml',csv:'csv',srt:'srt'}[currentTab];
+  const mime={fcpxml:'text/xml;charset=utf-8',full_fcpxml:'text/xml;charset=utf-8',word_fcpxml:'text/xml;charset=utf-8',tele_fcpxml:'text/xml;charset=utf-8',csv:'text/csv;charset=utf-8',srt:'text/plain;charset=utf-8'}[currentTab];
   let name=(document.getElementById('dl-filename-inp').value.trim()||'lyrics_sync');
   // Strip extension if user typed it
   if(name.endsWith('.'+ext)) name=name.slice(0,-(ext.length+1));
@@ -1813,7 +1919,7 @@ function clearAll(){
   document.getElementById('fmt-pill').className='fmt-pill';
   document.getElementById('output-box').innerHTML='<span class="output-placeholder">Output will appear here after conversion…</span>';
   document.getElementById('line-jump-inp').value='';
-  outputs={fcpxml:'',word_fcpxml:'',tele_fcpxml:'',csv:'',srt:''};parsedLines=[];lastPlayerIdx=-1;currentPlayingIdx=-1;plsLastIdx=-1;
+  outputs={fcpxml:'',full_fcpxml:'',word_fcpxml:'',tele_fcpxml:'',csv:'',srt:''};parsedLines=[];lastPlayerIdx=-1;currentPlayingIdx=-1;plsLastIdx=-1;
   const pls=document.getElementById('player-lyrics-scroll');pls.innerHTML='';pls.dataset.built='0';
   if(playerOpen){
     document.getElementById('player-cur').innerHTML='<span style="color:var(--text3);font-size:0.95rem;font-weight:400;letter-spacing:0.05em">♩ ♪ ♫ ♬</span>';
