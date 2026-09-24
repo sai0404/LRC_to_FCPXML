@@ -940,11 +940,18 @@ function detectScripts(t){
 function toDisp(sec){const m=Math.floor(sec/60),s=(sec%60).toFixed(2).padStart(5,'0');return`${m}:${s}`}
 function toDispShort(sec){const m=Math.floor(sec/60),s=Math.floor(sec%60).toString().padStart(2,'0');return`${m}:${s}`}
 function toFCP(sec){return`${Math.round(sec*100)}/100s`}
-function toFCPoff(sec){
-  // Apply the user-set offset (ms) to all timestamps in FCPXML export
+function toFCPstart(sec){
+  // Apply offset ONLY to start timestamps — shifts clip start time
   const adjusted=sec+(fcpOpts.offsetMs||0)/1000;
   return`${Math.round(Math.max(0,adjusted)*100)}/100s`;
 }
+function toFCPdur(sec){
+  // NEVER apply offset to durations — duration is always the raw gap
+  // Applying offset to dur causes gaps/overlaps between clips in FCP
+  return`${Math.round(Math.max(0,sec)*100)}/100s`;
+}
+// Keep toFCPoff as alias for start (backwards compat with word-level clips)
+function toFCPoff(sec){ return toFCPstart(sec); }
 function toSRTt(sec){
   const h=Math.floor(sec/3600).toString().padStart(2,'0');
   const m=Math.floor((sec%3600)/60).toString().padStart(2,'0');
@@ -1021,8 +1028,8 @@ function generateFCPXML(lines){
   let ridC=3, tsC=1;
 
   lines.forEach((activeLine, activeIdx)=>{
-    const offset=toFCPoff(activeLine.ts);
-    const dur=toFCPoff(activeLine.dur);
+    const offset=toFCPstart(activeLine.ts);
+    const dur=toFCPdur(activeLine.dur);
     const rid=`r${ridC++}`;
     const clipLabel=safeA(activeLine.displayText.slice(0,28));
 
@@ -1124,8 +1131,8 @@ function generateFullFCPXML(lines){
   let ridC=3, tsC=1;
 
   lines.forEach((activeLine, activeIdx)=>{
-    const offset=toFCPoff(activeLine.ts);
-    const dur   =toFCPoff(activeLine.dur);
+    const offset=toFCPstart(activeLine.ts);
+    const dur   =toFCPdur(activeLine.dur);
     const rid   =`r${ridC++}`;
     const label =safeA(activeLine.displayText.slice(0,28));
 
@@ -1233,8 +1240,8 @@ function generateTeleFCPXML(lines){
   //   lines after: dim
   // This creates the teleprompter scroll feel inside FCP.
   lines.forEach((activeLine, activeIdx)=>{
-    const offset=toFCPoff(activeLine.ts);
-    const dur=toFCPoff(activeLine.dur);
+    const offset=toFCPstart(activeLine.ts);
+    const dur=toFCPdur(activeLine.dur);
     const rid=`r${ridC++}`;
     const clipName=safe(activeLine.displayText.slice(0,30));
 
@@ -1358,8 +1365,8 @@ function generateWordFCPXML(lines){
       // Plain line — one dim title for full duration
       const rid=`r${ridCounter++}`;
       const tsid=`ts${tsCounter++}`;
-      const offset=toFCPoff(line.ts);
-      const dur=toFCPoff(line.dur);
+      const offset=toFCPstart(line.ts);
+      const dur=toFCPdur(line.dur);
       const txt=safeC(line.displayText);
       const attr=safe(line.displayText);
       fx+=`\n        <effect id="${rid}" name="Basic Title" uid=".../Titles.localized/Bumper:Opener.localized/Basic Title.localized/Basic Title.moti"/>`;
@@ -1377,8 +1384,8 @@ function generateWordFCPXML(lines){
     }
 
     const words=line.words;
-    const lineOffset=toFCP(line.ts);
-    const lineDur=toFCP(line.dur);
+    const lineOffset=toFCPstart(line.ts);
+    const lineDur=toFCPdur(line.dur);
     const fullText=safeC(line.displayText);
     const fullAttr=safe(line.displayText);
 
@@ -1408,8 +1415,8 @@ function generateWordFCPXML(lines){
     //               before it: spoken (gold-dim), after it: future (dim)
     //   • placed on lane 2 (on top of base layer)
     words.forEach((word, wi)=>{
-      const wordOffset=toFCPoff(word.ts);
-      const wordDur=toFCPoff(word.dur);
+      const wordOffset=toFCPstart(word.ts);
+      const wordDur=toFCPdur(word.dur);
       const ridW=`r${ridCounter++}`;
       const wordAttr=safe(word.word);
 
