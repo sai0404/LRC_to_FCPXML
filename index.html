@@ -1085,8 +1085,8 @@ function generateFCPXML(lines){
                             <!-- Active line ${activeIdx+1}/${lines.length}: ${clipLabel} -->
                             <title name="${clipLabel} [${activeIdx+1}]" lane="1" offset="${offset}" duration="${dur}" start="0s" ref="${rid}">
                                 <param name="Alignment" key="9999/10003/13069/13070/2/354/999" value="${alignVal}"/>
-                                <adjust-transform position="${vPos}" anchor="0 0"/>
                                 ${textBlock}${tsDefs}
+                                <adjust-transform position="${vPos}" anchor="0 0"/>
                             </title>`;
   });
 
@@ -1183,8 +1183,8 @@ function generateFullFCPXML(lines){
                             <!-- Line ${activeIdx+1}/${lines.length}: ${label} -->
                             <title name="${label} [${activeIdx+1}]" lane="1" offset="${offset}" duration="${dur}" start="0s" ref="${rid}">
                                 <param name="Alignment" key="9999/10003/13069/13070/2/354/999" value="${alignVal}"/>
-                                <adjust-transform position="${vPos}" anchor="0 0"/>
                                 ${textBlock}${tsDefs}
+                                <adjust-transform position="${vPos}" anchor="0 0"/>
                             </title>`;
   });
 
@@ -1301,8 +1301,8 @@ function generateTeleFCPXML(lines){
                             <!-- Line ${activeIdx+1}: ${clipName} -->
                             <title name="${clipName} [${activeIdx+1}/${lines.length}]" lane="1" offset="${offset}" duration="${dur}" start="0s" ref="${rid}">
                                 <param name="Alignment" key="9999/10003/13069/13070/2/354/999" value="${alignVal}"/>
-                                <adjust-transform position="${vPos}" anchor="0 0"/>
                                 ${textBlock}${tsDefs}
+                                <adjust-transform position="${vPos}" anchor="0 0"/>
                             </title>`;
   });
 
@@ -1391,12 +1391,12 @@ function generateWordFCPXML(lines){
       clips+=`
                             <title name="${attr}" lane="1" offset="${offset}" duration="${dur}" start="0s" ref="${rid}">
                                 <param name="Alignment" key="9999/10003/13069/13070/2/354/999" value="${alignVal}"/>
-                                <adjust-transform position="${vPos}" anchor="0 0"/>
                                 <text><text-style ref="${tsid}">${txt}</text-style></text>
                                 <text-style-def id="${tsid}">
                                     <text-style font="${font}" fontSize="${fontSize}" fontFace="Bold"
                                         fontColor="${activeColor}" ${shadowAttr} alignment="${fcpOpts.align}"/>
                                 </text-style-def>
+                                <adjust-transform position="${vPos}" anchor="0 0"/>
                             </title>`;
       return;
     }
@@ -1417,12 +1417,12 @@ function generateWordFCPXML(lines){
                             <!-- LINE ${lineIdx+1}: dim base layer -->
                             <title name="${fullAttr} [base]" lane="1" offset="${lineOffset}" duration="${lineDur}" start="0s" ref="${ridBase}">
                                 <param name="Alignment" key="9999/10003/13069/13070/2/354/999" value="${alignVal}"/>
-                                <adjust-transform position="${vPos}" anchor="0 0"/>
                                 <text><text-style ref="${tsidBase}">${fullText}</text-style></text>
                                 <text-style-def id="${tsidBase}">
                                     <text-style font="${font}" fontSize="${fontSize}" fontFace="Bold"
                                         fontColor="${dimColor}" alignment="${fcpOpts.align}"/>
                                 </text-style-def>
+                                <adjust-transform position="${vPos}" anchor="0 0"/>
                             </title>`;
 
     // ── Layer 1..N: one bright clip per word ──
@@ -1468,8 +1468,8 @@ function generateWordFCPXML(lines){
                             <!-- word: ${wordAttr} -->
                             <title name="${wordAttr} [w${wi+1}]" lane="2" offset="${wordOffset}" duration="${wordDur}" start="0s" ref="${ridW}">
                                 <param name="Alignment" key="9999/10003/13069/13070/2/354/999" value="${alignVal}"/>
-                                <adjust-transform position="${vPos}" anchor="0 0"/>
                                 ${textBlock}${tsDefsBlock}
+                                <adjust-transform position="${vPos}" anchor="0 0"/>
                             </title>`;
     });
   });
